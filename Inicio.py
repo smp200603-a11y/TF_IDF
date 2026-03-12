@@ -5,16 +5,17 @@ import pandas as pd
 import re
 from nltk.stem import SnowballStemmer
 from PIL import Image
+import os
 
 st.title("Buscador de textos con TF-IDF")
 
-# Imagen
-imagen = Image.open("pollo.png")
-st.image(imagen, width=250)
+# Mostrar imagen solo si existe
+if os.path.exists("pollo.png"):
+    imagen = Image.open("pollo.png")
+    st.image(imagen, width=250)
 
-st.write("Escribe varios textos y luego una pregunta. El sistema buscará el texto más parecido.")
+st.write("Escribe varios textos y una pregunta. El sistema buscará el texto más parecido.")
 
-# Textos de ejemplo
 text_input = st.text_area(
     "Textos (uno por línea):",
     "Dogs bark loudly.\nCats sleep during the day.\nDogs and cats can live together."

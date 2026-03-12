@@ -4,88 +4,73 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import re
 from nltk.stem import SnowballStemmer
+from PIL import Image
 
-st.title("Buscador de similitud con TF-IDF")
+st.title("Buscador de textos con TF-IDF")
 
-st.write("""
-Cada línea ingresada se interpreta como un **documento independiente**.  
-Puede ser una oración corta o incluso un pequeño párrafo.
+# Imagen
+imagen = Image.open("pollo.png")
+st.image(imagen, width=250)
 
-El sistema utiliza **TF-IDF y similitud del coseno** para encontrar el texto
-que más se parece a la pregunta escrita por el usuario.
+st.write("Escribe varios textos y luego una pregunta. El sistema buscará el texto más parecido.")
 
-El procesamiento aplica **normalización y stemming**, por lo que palabras
-como *running* y *run* pueden ser tratadas como equivalentes.
-""")
-
-# Texto inicial de ejemplo
-docs_input = st.text_area(
-    "Ingresa varios textos (uno por línea):",
-    "Dogs bark when they see strangers.\nCats like to sleep during the day.\nDogs and cats sometimes live together."
+# Textos de ejemplo
+text_input = st.text_area(
+    "Textos (uno por línea):",
+    "Dogs bark loudly.\nCats sleep during the day.\nDogs and cats can live together."
 )
 
-question = st.text_input("Escribe una pregunta para buscar coincidencias:", "Who sleeps during the day?")
+question = st.text_input("Pregunta:", "Who sleeps during the day?")
 
-# Inicializar stemmer
 stemmer = SnowballStemmer("english")
 
-def limpiar_y_stem(texto: str):
+def procesar(texto):
     texto = texto.lower()
     texto = re.sub(r'[^a-z\s]', ' ', texto)
-    tokens = [t for t in texto.split() if len(t) > 1]
-    stems = [stemmer.stem(t) for t in tokens]
-    return stems
+    palabras = [t for t in texto.split() if len(t) > 1]
+    return [stemmer.stem(p) for p in palabras]
 
-if st.button("Analizar textos"):
-    documentos = [d.strip() for d in docs_input.split("\n") if d.strip()]
+if st.button("Buscar coincidencia"):
 
-    if len(documentos) == 0:
-        st.warning("Debes ingresar al menos un texto.")
+    docs = [d.strip() for d in text_input.split("\n") if d.strip()]
+
+    if len(docs) == 0:
+        st.warning("Ingresa al menos un texto.")
     else:
 
-        vectorizador = TfidfVectorizer(
-            tokenizer=limpiar_y_stem,
+        vectorizer = TfidfVectorizer(
+            tokenizer=procesar,
             stop_words="english",
             token_pattern=None
         )
 
-        matriz = vectorizador.fit_transform(documentos)
+        X = vectorizer.fit_transform(docs)
 
         df = pd.DataFrame(
-            matriz.toarray(),
-            columns=vectorizador.get_feature_names_out(),
-            index=[f"Texto {i+1}" for i in range(len(documentos))]
+            X.toarray(),
+            columns=vectorizer.get_feature_names_out(),
+            index=[f"Doc {i+1}" for i in range(len(docs))]
         )
 
-        st.write("### Matriz TF-IDF generada")
+        st.subheader("Matriz TF-IDF")
         st.dataframe(df.round(3))
 
-        # Transformar pregunta
-        pregunta_vec = vectorizador.transform([question])
+        q_vec = vectorizer.transform([question])
 
-        similitudes = cosine_similarity(pregunta_vec, matriz).flatten()
+        sims = cosine_similarity(q_vec, X).flatten()
 
-        mejor = similitudes.argmax()
-        mejor_texto = documentos[mejor]
-        mejor_valor = similitudes[mejor]
+        best = sims.argmax()
 
-        st.write("### Resultado de búsqueda")
-        st.write(f"**Pregunta ingresada:** {question}")
-        st.write(f"**Texto más similar (Texto {mejor+1}):** {mejor_texto}")
-        st.write(f"**Nivel de similitud:** {mejor_valor:.3f}")
+        st.subheader("Resultado")
+        st.write("Pregunta:", question)
+        st.write("Documento más cercano:", docs[best])
+        st.write("Similitud:", round(sims[best],3))
 
-        tabla_sim = pd.DataFrame({
-            "Texto": [f"Texto {i+1}" for i in range(len(documentos))],
-            "Contenido": documentos,
-            "Similitud": similitudes
+        tabla = pd.DataFrame({
+            "Documento":[f"Doc {i+1}" for i in range(len(docs))],
+            "Texto":docs,
+            "Similitud":sims
         })
 
-        st.write("### Comparación de similitudes")
-        st.dataframe(tabla_sim.sort_values("Similitud", ascending=False))
-
-        vocabulario = vectorizador.get_feature_names_out()
-        stems_pregunta = limpiar_y_stem(question)
-
-        coincidencias = [s for s in stems_pregunta if s in vocabulario and df.iloc[mejor].get(s, 0) > 0]
-
-        st.write("### Palabras clave de la pregunta encontradas en el texto:", coincidencias)
+        st.subheader("Comparación")
+        st.dataframe(tabla.sort_values("Similitud", ascending=False))
